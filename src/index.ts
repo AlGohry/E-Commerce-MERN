@@ -1,8 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
 import userRoute from "./routes/userRoute";
-import { seedInitialProducts } from "./services/productService";
+import cartRoute from "./routes/cartRoute";
 import productRoute from "./routes/productRoute";
+import { seedInitialProducts } from "./services/productService";
 
 const app = express();
 const port = 3001;
@@ -20,6 +21,7 @@ seedInitialProducts();
 
 app.use('/user', userRoute)
 app.use('/product', productRoute)
+app.use('/cart', cartRoute)
 
 app.listen(port, () => {
   console.log(`Sevrer is running at: http://localhost:${port}`)
