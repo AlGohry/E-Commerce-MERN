@@ -35,14 +35,14 @@ interface AddItemToCart {
 export const addItemToCart = async ({ userId, productID, quantity }: AddItemToCart) => {
   const cart = await getActiveCartForUser({ userId });
 
-  // التحقق مما إذا كان المنتج موجودًا بالفعل في السلة
   const existingItemInCart = cart.items.find((p) => p.product.toString() === productID);
 
   if (existingItemInCart) {
     return { data: "Item already exists in cart", statusCode: 400 };
   }
-
+// Fetch the product 
   const product = await productModel.findById(productID);
+
   if (!product) {
     return { data: "Product not found", statusCode: 400 };
   }
@@ -51,14 +51,68 @@ export const addItemToCart = async ({ userId, productID, quantity }: AddItemToCa
     return { data: "Insufficient stock for item", statusCode: 400 };
   }
 
-  // إضافة المنتج إلى السلة
   cart.items.push({ product: productID, unitPrice: product.price, quantity });
 
-  // تحديث إجمالي السعر
   cart.totalAmount += product.price * quantity;
 
   const updatedCart = await cart.save();
   return { data: updatedCart, statusCode: 200 };
 };
 
+interface UpdateItemInCart {
+  productId: any;
+  quantity: number;
+  userId: string;
+}
 
+export const updateItemInCart = async ({ productId, quantity, userId, }: UpdateItemInCart) => {
+  // Retrieve the active cart for the user
+  const cart = await getActiveCartForUser({ userId });
+
+  // Check if the product exists in the cart
+  const existsInCart = cart.items.find(
+    (p) => p.product.toString() === productId
+  );
+
+  // If the product does not exist, return an error response
+  if (!existsInCart) {
+    return { data: "Item does not exist in cart", statusCode: 400 };
+  }
+  const product = await productModel.findById(productId);
+
+  if (!product) {
+    return { data: "Product not found", statusCode: 400 };
+  }
+
+  if (product.stock < quantity) {
+    return { data: "Insufficient stock for item", statusCode: 400 };
+  }
+
+  // Update the quantity of the existing product in the cart
+  existsInCart.quantity = quantity;
+
+
+  // Get all other cart items excluding the updated product
+  const otherCartItems = cart.items.filter(
+    (p) => p.product.toString() !== productId
+  );
+
+  // Calculate the total amount of the cart excluding the updated product
+  let total = otherCartItems.reduce((sum, product) => {
+    sum += product.quantity * product.unitPrice;
+    return sum;
+  }, 0);
+
+  // Update the quantity of the existing item in the cart
+  existsInCart.quantity = quantity;
+
+  // Add the updated product's total price to the cart's total amount
+  total += existsInCart.quantity * existsInCart.unitPrice;
+
+  cart.totalAmount = total;
+  // Save the updated cart to the database
+  const updatedCart = await cart.save();
+
+  // Return the updated cart data with a success status code
+  return { data: updatedCart, statusCode: 200 };
+};
