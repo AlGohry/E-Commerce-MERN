@@ -1,5 +1,5 @@
 // import { addItemToCart } from './cartService';
-import { cartModel } from "../models/cartModel";
+import { cartModel, ICart, ICartItem } from "../models/cartModel";
 import productModel from "../models/productModel";
 
 interface CreateCartForUser {
@@ -16,7 +16,9 @@ interface GetActiveCartForUser {
   userId: string;
 }
 
-export const getActiveCartForUser = async ({ userId }: GetActiveCartForUser) => {
+export const getActiveCartForUser = async ({
+  userId,
+}: GetActiveCartForUser) => {
   let cart = await cartModel.findOne({ userId, status: "active" });
 
   if (!cart) {
@@ -32,15 +34,21 @@ interface AddItemToCart {
   quantity: number;
 }
 
-export const addItemToCart = async ({ userId, productID, quantity }: AddItemToCart) => {
+export const addItemToCart = async ({
+  userId,
+  productID,
+  quantity,
+}: AddItemToCart) => {
   const cart = await getActiveCartForUser({ userId });
 
-  const existingItemInCart = cart.items.find((p) => p.product.toString() === productID);
+  const existingItemInCart = cart.items.find(
+    (p) => p.product.toString() === productID
+  );
 
   if (existingItemInCart) {
     return { data: "Item already exists in cart", statusCode: 400 };
   }
-// Fetch the product 
+  // Fetch the product
   const product = await productModel.findById(productID);
 
   if (!product) {
@@ -65,7 +73,11 @@ interface UpdateItemInCart {
   userId: string;
 }
 
-export const updateItemInCart = async ({ productId, quantity, userId, }: UpdateItemInCart) => {
+export const updateItemInCart = async ({
+  productId,
+  quantity,
+  userId,
+}: UpdateItemInCart) => {
   // Retrieve the active cart for the user
   const cart = await getActiveCartForUser({ userId });
 
@@ -91,17 +103,14 @@ export const updateItemInCart = async ({ productId, quantity, userId, }: UpdateI
   // Update the quantity of the existing product in the cart
   existsInCart.quantity = quantity;
 
-
   // Get all other cart items excluding the updated product
   const otherCartItems = cart.items.filter(
     (p) => p.product.toString() !== productId
   );
 
   // Calculate the total amount of the cart excluding the updated product
-  let total = otherCartItems.reduce((sum, product) => {
-    sum += product.quantity * product.unitPrice;
-    return sum;
-  }, 0);
+  let total = calculateCartTotalItems({cartItems:otherCartItems})
+
 
   // Update the quantity of the existing item in the cart
   existsInCart.quantity = quantity;
@@ -115,4 +124,47 @@ export const updateItemInCart = async ({ productId, quantity, userId, }: UpdateI
 
   // Return the updated cart data with a success status code
   return { data: updatedCart, statusCode: 200 };
+};
+
+interface DeleteItemInCart {
+  productId: any; // The ID of the product to be deleted from the cart
+  userId: string; // The ID of the user whose cart is being modified
+}
+
+export const deleteItemInCart = async ({
+  userId,
+  productId,
+}: DeleteItemInCart) => {
+  const cart = await getActiveCartForUser({ userId }); // Retrieve the active cart for the user
+
+  const existsInCart = cart.items.find(
+    (p) => p.product.toString() === productId // Check if the product exists in the cart
+  );
+
+  if (!existsInCart) {
+    return { data: "Item does not exist in cart", statusCode: 400 }; // Return an error if the product is not in the cart
+  }
+
+  const otherCartItems = cart.items.filter(
+    (p) => p.product.toString() !== productId
+  ); // Filter out the product to be deleted
+
+  const total = calculateCartTotalItems({cartItems:otherCartItems})
+  
+  cart.items = otherCartItems;
+  cart.totalAmount = total;
+  const updatedCart = await cart.save();
+  return { data: updatedCart, statusCode: 200 };
+};
+
+const calculateCartTotalItems = ({ cartItems, }: { cartItems: ICartItem[] }) => {
+
+  
+
+  const total = cartItems.reduce((sum, product) => {
+    sum += product.quantity * product.unitPrice; 
+    return sum;
+  }, 0);
+
+  return total; 
 };
